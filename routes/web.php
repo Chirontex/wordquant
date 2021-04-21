@@ -14,4 +14,9 @@ use App\Http\Controllers\FormController;
 |
 */
 
-Route::get('/', [FormController::class, 'entrance']);
+Route::get('/', function() {
+
+    return view('form');
+
+});
+Route::post('/', [FormController::class, 'entrance']);
