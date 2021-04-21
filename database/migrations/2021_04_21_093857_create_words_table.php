@@ -18,6 +18,7 @@ class CreateWordsTable extends Migration
             $table->string('word');
             $table->integer('level');
             $table->bigInteger('count');
+            $table->timestamps();
         });
     }
 

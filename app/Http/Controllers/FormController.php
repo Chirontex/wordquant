@@ -9,8 +9,6 @@ use Illuminate\Http\Request;
 class FormController extends Controller
 {
 
-    protected $level = 0;
-
     protected $handled = [];
     
     public function entrance(Request $request)
@@ -31,7 +29,8 @@ class FormController extends Controller
                         'notice' => [
                             'type' => 'danger',
                             'text' => $e->getMessage()
-                        ]
+                        ],
+                        'prev_text' => $request->input('text')
                     ]
                 );
 
@@ -44,22 +43,29 @@ class FormController extends Controller
 
                 foreach ($words as $word) {
 
-                    $model = Word::where('level', $level)
-                        ->where('word', $word)->get();
+                    $word = trim($word);
 
-                    if (empty($model)) {
+                    if (!empty($word)) {
 
-                        $model = new Word;
+                        $model = Word::where('level', $level)
+                            ->where('word', $word)
+                            ->first();
 
-                        $model->word = $word;
-                        $model->level = $level;
-                        $model->count = 0;
+                        if (empty($model)) {
+
+                            $model = new Word;
+
+                            $model->word = $word;
+                            $model->level = $level;
+                            $model->count = 0;
+
+                        }
+
+                        $model->count += 1;
+
+                        $model->save();
 
                     }
-
-                    $model->count += 1;
-
-                    $model->save();
 
                 }
 
@@ -79,12 +85,8 @@ class FormController extends Controller
 
     }
 
-    protected function handle(string $text) : self
+    protected function handle(string $text, int $level = 1) : self
     {
-
-        $this->level += 1;
-
-        if (!empty($handled)) $text = trim($text, " .,!?\n\r\t\0\v");
 
         $open = substr($text, 0, 1);
 
@@ -99,104 +101,48 @@ class FormController extends Controller
 
         $text = trim($text, $open.$close);
 
-        /**
-         * Надо переписать с этого места.
-         */
-        $next_level = [];
+        $subs = $this->extractNextLevels($text);
 
-        foreach (['(', '[', '{'] as $b) {
+        if (!empty($subs)) {
 
-            $pos = strpos($text, $b);
+            foreach ($subs as $sub) {
 
-            if ($pos !== false) {
-
-                $write = true;
-
-                if (isset($next_level['open'])) {
-
-                    if ($next_level['open']['pos'] < $pos) $write = false;
-
-                }
-
-                if ($write === true) $next_level['open'] = [
-                    'bracket' => $b,
-                    'pos' => $pos
-                ];
+                $text = str_replace($sub['text'], '', $text);
 
             }
 
         }
 
-        foreach ([')', ']', '}'] as $b) {
-
-            $pos = strrpos($text, $b);
-
-            if ($pos !== false) {
-
-                $write = true;
-
-                if (isset($next_level['close'])) {
-
-                    if ($next_level['close']['pos'] > $pos) $write = false;
-
-                }
-
-                if ($write === true) $next_level['close'] = [
-                    'bracket' => $b,
-                    'pos' => $pos
-                ];
-
-            }
-
-        }
-
-        if ((!isset($next_level['open']) &&
-                isset($next_level['close'])) ||
-            isset($next_level['open']) &&
-            !isset($next_level['close'])) throw new FormControllerException(
-                'В строке "'.$text.
-                    '" обнаружен некорректный уровень вложенности.',
-                -3
-            );
-
-        if (!empty($next_level)) {
-            
-            $next_level_text = substr(
-                $text,
-                $next_level['open']['pos'],
-                iconv_strlen($text) - $next_level['close']['pos']
-            );
-
-            $text_start = substr($text, 0, $next_level['open']['pos']);
-
-            $text_end = substr($text, $next_level['close']['pos']);
-
-            $text = trim($text_start).' '.trim($text_end);
-        
-        }
-
-        $text = str_replace(
-            ['.', ',', '!', '?'],
-            ' ',
-            $text
-        );
-
+        $text = str_replace(['.', ',', '!', '?'], ' ', $text);
         $text = explode(' ', $text);
 
-        if (count($text) < 3) throw new FormControllerException(
-            'Уровень должен содержать как минимум 3 слова.',
-            -4
-        );
+        $text = array_map(function($word) {
 
-        $text = array_map(function($value) {
-
-            return trim($value);
+            return trim($word);
 
         }, $text);
 
-        $this->handled['level_'.$this->level] = $text;
+        if (count($text) < 3) throw new FormControllerException(
+            'Уровень должен содержать как минимум 3 слова.',
+            -3
+        );
 
-        if (isset($next_level_text)) $this->handle($next_level_text);
+        if (isset(
+            $this->handled['level_'.$level]
+        )) $this->handled['level_'.$level] = array_merge(
+            $this->handled['level_'.$level], $text
+        );
+        else $this->handled['level_'.$level] = $text;
+
+        if (!empty($subs)) {
+
+            foreach ($subs as $sub) {
+
+                $this->handle($sub['text'], $level + 1);
+
+            }
+
+        }
 
         return $this;
 
@@ -238,32 +184,31 @@ class FormController extends Controller
         };
 
         while (str_contains($text, '{') ||
-                str_contains($text, '[') ||
-                str_contains($text, '(') ||
-                str_contains($text, '}') ||
-                str_contains($text, ']') ||
-                str_contains($text, ')')) {
+            str_contains($text, '[') ||
+            str_contains($text, '(') ||
+            str_contains($text, '}') ||
+            str_contains($text, ']') ||
+            str_contains($text, ')')) {
 
-            $sub = [
-                'open' => call_user_func($fn, $text, ['{', '[', '(']),
-                'close' => call_user_func($fn, $text, ['}', ']', ')'])
-            ];
+            $sub = [];
+
+            $sub['open'] = call_user_func($fn, $text, ['{', '[', '(']);
+
+            if (!empty($sub['open'])) $sub['close'] = call_user_func(
+                $fn,
+                $text,
+                [$this->getCloseBracket($sub['open']['bracket'])]
+            );
 
             if (!empty($sub['open']) &&
-                !empty($sub['close']) &&
-                $sub['close']['bracket'] ===
-                    $this->getCloseBracket($sub['open']['bracket'])) {
+                !empty($sub['close'])) {
 
                 $sub['text'] = substr(
                     $text, 
                     $sub['open']['pos'],
-                    $sub['close']['pos'] + 1);
+                    $sub['close']['pos'] - $sub['open']['pos'] + 1);
 
-                $text_start = substr($text, 0, $sub['open']['pos']);
-
-                $text_end = substr($text, $sub['close']['pos']);
-
-                $text = $text_start.$text_end;
+                $text = str_replace($sub['text'], '', $text);
 
                 if (!empty($result)) {
                     
@@ -277,7 +222,10 @@ class FormController extends Controller
 
                 $result[] = $sub;
 
-            }
+            } else throw new FormControllerException(
+                'Строка "'.$text.'" содержит некорректный уровень вложенности.',
+                -4
+            );
 
         }
 
@@ -309,7 +257,7 @@ class FormController extends Controller
         }
 
         if (empty($close)) throw new FormControllerException(
-            'Некорректная скобка '.$open.'.',
+            'Некорректная скобка "'.$open.'".',
             -2
         );
 

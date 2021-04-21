@@ -1,1 +1,1 @@
-# Wordquant 0.0.6
+# Wordquant 0.0.7

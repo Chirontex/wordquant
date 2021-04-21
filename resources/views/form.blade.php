@@ -19,7 +19,7 @@
             <form action="" method="post">
                 <h1 class="h3 mb-3">Введите строку:</h1>
                 @csrf
-                <textarea name="text" cols="30" rows="10" class="form-control form-control-sm" required="true"></textarea>
+                <textarea name="text" cols="30" rows="10" class="form-control form-control-sm" required="true">@if(isset($prev_text)){{$prev_text}}@endif</textarea>
                 <div class="my-3 text-center">
                     <button class="btn btn-sm btn-primary">Сохранить</button>
                 </div>
