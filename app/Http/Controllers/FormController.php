@@ -11,6 +11,14 @@ class FormController extends Controller
 
     protected $handled = [];
     
+    /**
+     * Точка входа в контроллер для обработки формы.
+     * 
+     * @param Request $request
+     * Параметры запроса.
+     * 
+     * @return \Illuminate\Contracts\View\View|\Illuminate\Contracts\View\Factory
+     */
     public function entrance(Request $request)
     {
 
@@ -85,6 +93,20 @@ class FormController extends Controller
 
     }
 
+    /**
+     * Основной метод обработки строки.
+     * 
+     * @param string $text
+     * Строка из формы.
+     * 
+     * @param int $level
+     * Уровень вложенности.
+     * По умолчанию равен 1, т.к. начинаем всегда с первого уровня.
+     * 
+     * @return $this
+     * 
+     * @throws App\Exceptions\FormControllerException
+     */
     protected function handle(string $text, int $level = 1) : self
     {
 
@@ -148,11 +170,37 @@ class FormController extends Controller
 
     }
 
+    /**
+     * Извлекает следующий уровень вложнности из строки.
+     * 
+     * @param string $text
+     * Строка, из которой производится извлечение.
+     * 
+     * @return array
+     * Ассоциативный массив с участками следующего уровня вложенности
+     * и их координатами в исходной строке.
+     * 
+     * @throws App\Exceptions\FormControllerException
+     */
     protected function extractNextLevels(string $text) : array
     {
 
         $result = [];
 
+        /**
+         * Внутренняя функция, помогающая определить координаты и скобку,
+         * на которых начинается или заканчивается следующий уровень.
+         * 
+         * @param string $text
+         * Строка, по которой ищем.
+         * 
+         * @param array $brackets
+         * Список доступных скобок. Если ищем конец уровня, то лучше
+         * определить доступную скобку по открывающей.
+         * 
+         * @return array
+         * Скобка и координата.
+         */
         $fn = function(string $text, array $brackets) {
 
             $br = '';
@@ -233,6 +281,16 @@ class FormController extends Controller
 
     }
 
+    /**
+     * Возвращает закрывающую скобку по открывающей.
+     * 
+     * @param string $open
+     * Открывающая скобка.
+     * 
+     * @return string
+     * 
+     * @throws App\Exceptions\FormControllerException
+     */
     protected function getCloseBracket(string $open) : string
     {
 
