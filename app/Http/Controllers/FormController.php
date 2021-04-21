@@ -8,6 +8,8 @@ use App\Exceptions\FormControllerException;
 class FormController extends Controller
 {
 
+    protected $level = 0;
+
     protected $handled = [];
     
     public function entrance(Request $request)
@@ -22,20 +24,36 @@ class FormController extends Controller
 
     }
 
-    protected function handle(string $text)
+    protected function handle(string $text) : self
     {
+
+        $this->level += 1;
 
         if (!empty($handled)) $text = trim($text, " .,!?\n\r\t\0\v");
 
         $open = substr($text, 0, 1);
 
-        try {
+        switch ($open) {
 
-            $close = $this->closeBracket($open);
+            case '(':
+                $close = ')';
+                break;
 
-        } catch (FormControllerException $e) {}
+            case '{':
+                $close = '}';
+                break;
 
-        if (isset($e) ||
+            case '[':
+                $close = ']';
+                break;
+
+            default:
+                $close = '';
+                break;
+
+        }
+
+        if (empty($close) ||
             substr($text, -1, 1) !==
                 $close) throw new FormControllerException(
             'Строка "'.$text.'" не является корректной.',
@@ -94,15 +112,55 @@ class FormController extends Controller
 
         if (!isset($next_level['open']) &&
             isset($next_level['close'])) throw new FormControllerException(
-                'В строке "'.$text.'"обнаружен некорректный уровень вложенности.',
+                'В строке "'.$text.
+                    '" обнаружен некорректный уровень вложенности.',
                 -3
             );
 
-        //
+        if (!empty($next_level)) {
+            
+            $next_level_text = substr(
+                $text,
+                $next_level['open']['pos'],
+                iconv_strlen($text) - $next_level['close']['pos']
+            );
+
+            $text_start = substr($text, 0, $next_level['open']['pos']);
+
+            $text_end = substr($text, $next_level['close']['pos']);
+
+            $text = trim($text_start).' '.trim($text_end);
+        
+        }
+
+        $text = str_replace(
+            ['.', ',', '!', '?'],
+            ' ',
+            $text
+        );
+
+        $text = explode(' ', $text);
+
+        if (count($text) < 3) throw new FormControllerException(
+            'Уровень должен содержать как минимум 3 слова.',
+            -4
+        );
+
+        $text = array_map(function($value) {
+
+            return trim($value);
+
+        }, $text);
+
+        $this->handled['level_'.$this->level] = $text;
+
+        if (isset($next_level_text)) $this->handle($next_level_text);
+
+        return $this;
 
     }
 
-    protected function closeBracket(string $open_bracket) : string
+    /*protected function closeBracket(string $open_bracket) : string
     {
 
         switch ($open_bracket) {
@@ -132,6 +190,6 @@ class FormController extends Controller
 
         return $close_bracket;
 
-    }
+    }*/
 
 }
