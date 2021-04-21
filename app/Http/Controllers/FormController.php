@@ -110,8 +110,10 @@ class FormController extends Controller
 
         }
 
-        if (!isset($next_level['open']) &&
-            isset($next_level['close'])) throw new FormControllerException(
+        if ((!isset($next_level['open']) &&
+                isset($next_level['close'])) ||
+            isset($next_level['open']) &&
+            !isset($next_level['close'])) throw new FormControllerException(
                 'В строке "'.$text.
                     '" обнаружен некорректный уровень вложенности.',
                 -3
