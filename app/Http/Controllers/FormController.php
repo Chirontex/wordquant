@@ -51,29 +51,23 @@ class FormController extends Controller
 
                 foreach ($words as $word) {
 
-                    $word = trim($word);
+                    $model = Word::where('level', $level)
+                        ->where('word', $word)
+                        ->first();
 
-                    if (!empty($word)) {
+                    if (empty($model)) {
 
-                        $model = Word::where('level', $level)
-                            ->where('word', $word)
-                            ->first();
+                        $model = new Word;
 
-                        if (empty($model)) {
-
-                            $model = new Word;
-
-                            $model->word = $word;
-                            $model->level = $level;
-                            $model->count = 0;
-
-                        }
-
-                        $model->count += 1;
-
-                        $model->save();
+                        $model->word = $word;
+                        $model->level = $level;
+                        $model->count = 0;
 
                     }
+
+                    $model->count += 1;
+
+                    $model->save();
 
                 }
 
@@ -138,11 +132,23 @@ class FormController extends Controller
         $text = str_replace(['.', ',', '!', '?'], ' ', $text);
         $text = explode(' ', $text);
 
-        $text = array_map(function($word) {
+        $text_cleansed = [];
 
-            return trim($word);
+        foreach ($text as $word) {
 
-        }, $text);
+            $word = str_replace(
+                ["\n", "\r", "\t", "\0", "\v", " "],
+                '',
+                $word
+            );
+            
+            if (!empty($word)) $text_cleansed[] = $word;
+
+        }
+
+        $text = $text_cleansed;
+
+        unset($text_cleansed);
 
         if (count($text) < 3) throw new FormControllerException(
             'Уровень должен содержать как минимум 3 слова.',
